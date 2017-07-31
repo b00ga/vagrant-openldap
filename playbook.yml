@@ -1,0 +1,35 @@
+---
+- hosts: all
+  become: true
+
+  roles:
+    - goozbach.EPEL
+
+  tasks:
+  - name: Install Multicast DNS packages
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - avahi
+      - nss-mdns
+
+  - name: Start avahi
+    service:
+      name: avahi-daemon
+      state: started
+      enabled: true
+
+- hosts: auth
+  become: true
+  tasks:
+  - name: Install openldap server
+    package:
+      name: openldap-servers
+      state: present
+
+  - name: Start LDAP service
+    service:
+      name: slapd
+      state: started
+      enabled: true
