@@ -3,7 +3,7 @@
   become: true
 
   roles:
-    - goozbach.EPEL
+    - geerlingguy.repo-epel
 
   tasks:
   - name: Install Multicast DNS packages
