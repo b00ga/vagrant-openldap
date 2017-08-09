@@ -26,6 +26,7 @@
 
 - hosts: auth
   become: true
+
   tasks:
   - name: Install openldap server
     package:
@@ -98,3 +99,47 @@
     ldap_entry:
       dn: ou=groups,dc=example,dc=org
       objectClass: organizationalUnit
+
+  - name: Fetch generated self-signed OpenLDAP cert
+    command: certutil -L -d /etc/openldap/certs -a -n 'OpenLDAP Server'
+    register: openldap_cert
+    changed_when: false
+
+  - name: Copy server cert to client
+    copy:
+      content: "{{ openldap_cert.stdout }}\n"
+      dest: /etc/openldap/certs/auth.example.org.pem
+      owner: root
+      group: root
+      mode: 0644
+    delegate_to: somebox
+
+- hosts: somebox
+  become: true
+
+  tasks:
+  - name: Get contents of server cert
+    slurp:
+      src: /etc/openldap/certs/auth.example.org.pem
+    register: servercert
+
+  - name: Check if the server cert is in the cert db
+    shell: certutil -L -d /etc/openldap/certs -n 'OpenLDAP Server' -a
+    register: certonclient
+    changed_when: false
+    failed_when: false
+
+  - name: Check trust settings for server cert
+    shell: certutil -L -d /etc/openldap/certs | awk '/OpenLDAP Server/ { print $NF }'
+    register: trustsettings
+    changed_when: false
+    when: certonclient.rc == 0
+
+  - name: Remove server cert from trust store if its not correct
+    command: certutil -D -d /etc/openldap/certs -n 'OpenLDAP Server'
+    when: certonclient.rc == 0 and certonclient.stdout | replace('\n', '')  != servercert['content'] | b64decode | replace('\n', '') 
+
+  - name: Install server cert to client OpenLDAP cert db
+    shell: certutil -A -d /etc/openldap/certs -n 'OpenLDAP Server' -t CT -a -i /etc/openldap/certs/auth.example.org.pem
+    when: ( certonclient.rc != 0 ) or ( trustsettings.stdout != 'CT,,' )
+
