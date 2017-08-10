@@ -100,6 +100,46 @@
       dn: ou=groups,dc=example,dc=org
       objectClass: organizationalUnit
 
+  - name: Check installed schemas
+    find:
+      paths: /etc/openldap/slapd.d/cn=config/cn=schema
+    register: findschemas
+
+  - name: Create list of found schemas
+    set_fact:
+      installedschemas: "{{ findschemas.files | map(attribute='path') | map('basename') | map('regex_replace','cn={.*}(.*).ldif','\\1') | list }}"
+      # files is a dict of "stat" results. The first map just pulls out the path.
+      # the 2nd map applies basename to all those results to get just the filename
+      # the installed schema is cn={#}NAME.ldif, so we use a regex_replace to get just NAME
+
+  - name: Install cosine schema
+    shell: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/cosine.ldif
+    when: not ( "cosine" in installedschemas )
+
+  - name: Install inetorgperson schema
+    shell: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/inetorgperson.ldif
+    when: not ( "inetorgperson" in installedschemas )
+
+  - name: Install nis schema
+    shell: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif
+    when: not ( "nis" in installedschemas )
+
+  - name: Create faculty/staff group
+    ldap_entry:
+      dn: cn=facstaff,ou=groups,dc=example,dc=org
+      objectClass: posixGroup
+      attributes:
+        cn: facstaff
+        gidNumber: 10000
+
+  - name: Create student group
+    ldap_entry:
+      dn: cn=student,ou=groups,dc=example,dc=org
+      objectClass: posixGroup
+      attributes:
+        cn: student
+        gidNumber: 10001
+
   - name: Fetch generated self-signed OpenLDAP cert
     command: certutil -L -d /etc/openldap/certs -a -n 'OpenLDAP Server'
     register: openldap_cert
