@@ -140,6 +140,24 @@
         cn: student
         gidNumber: 10001
 
+  - name: Create Nick Danger
+    ldap_entry:
+      dn: uid=danger,ou=users,dc=example,dc=org
+      objectClass:
+        - account
+        - posixAccount
+        - shadowAccount
+      attributes:
+        cn: danger
+        uid: danger
+        gecos: "Nick Danger"
+        uidNumber: 10000
+        gidNumber: 10000
+        homeDirectory: /home/danger
+        # Generated with: slappasswd -s nicksyourbuddy
+        userPassword: "{SSHA}AslzrpM+OR/qAoeoOsnqfElGAZqTz3Ny"
+        loginShell: /bin/bash
+
   - name: Fetch generated self-signed OpenLDAP cert
     command: certutil -L -d /etc/openldap/certs -a -n 'OpenLDAP Server'
     register: openldap_cert
@@ -183,3 +201,48 @@
     shell: certutil -A -d /etc/openldap/certs -n 'OpenLDAP Server' -t CT -a -i /etc/openldap/certs/auth.example.org.pem
     when: ( certonclient.rc != 0 ) or ( trustsettings.stdout != 'CT,,' )
 
+  - name: Install sssd packages
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - sssd
+      - sssd-ldap
+
+  - name: Install sssd config
+    copy:
+      src: sssd.conf
+      dest: /etc/sssd/sssd.conf
+      owner: root
+      group: root
+      mode: 0600
+    notify: Restart sssd
+
+  - name: Start sssd service
+    service:
+      name: sssd
+      state: started
+      enabled: true
+
+  - name: Enable sssd auth
+    lineinfile:
+      path: /etc/sysconfig/authconfig
+      regexp: '^USESSSDAUTH='
+      line: 'USESSSDAUTH=yes'
+    notify: Update authconfig
+
+  - name: Enable mkhomedir
+    lineinfile:
+      path: /etc/sysconfig/authconfig
+      regexp: '^USEMKHOMEDIR='
+      line: 'USEMKHOMEDIR=yes'
+    notify: Update authconfig
+
+  handlers:
+  - name: Restart sssd
+    service:
+      name: sssd
+      state: restarted
+
+  - name: Update authconfig
+    command: /sbin/authconfig --updateall
