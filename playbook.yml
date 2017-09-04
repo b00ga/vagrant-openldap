@@ -124,6 +124,20 @@
     shell: ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/nis.ldif
     when: not ( "nis" in installedschemas )
 
+  # Place restrictions on userPassword attribute
+  # http://www.openldap.org/doc/admin24/guide.html#Basic ACLs
+  - name:  Restrict access to userPassword attribute
+    ldap_attr:
+      dn: olcDatabase={2}hdb,cn=config
+      name: olcAccess
+      values:
+      - >-
+        {0}to attrs=userPassword
+          by self =xw
+          by anonymous auth
+          by * none
+      state: present
+
   - name: Create faculty/staff group
     ldap_entry:
       dn: cn=facstaff,ou=groups,dc=example,dc=org
@@ -156,6 +170,42 @@
         homeDirectory: /home/danger
         # Generated with: slappasswd -s nicksyourbuddy
         userPassword: "{SSHA}AslzrpM+OR/qAoeoOsnqfElGAZqTz3Ny"
+        loginShell: /bin/bash
+
+  - name: Create Josh Isaknob
+    ldap_entry:
+      dn: uid=isaknob,ou=users,dc=example,dc=org
+      objectClass:
+        - account
+        - posixAccount
+        - shadowAccount
+      attributes:
+        cn: isaknob
+        uid: isaknob
+        gecos: "Josh Isaknob"
+        uidNumber: 10001
+        gidNumber: 10001
+        homeDirectory: /home/isaknob
+        # Generated with: slappasswd -s mmmveggies
+        userPassword: "{SSHA}32o227wHOoR7Oz0GGX/O++Gihkc6z7s4"
+        loginShell: /bin/bash
+
+  - name: Johnny Hashmark
+    ldap_entry:
+      dn: uid=hashmark,ou=users,dc=example,dc=org
+      objectClass:
+        - account
+        - posixAccount
+        - shadowAccount
+      attributes:
+        cn: hashmark
+        uid: hashmark
+        gecos: "Johnny Hashmark"
+        uidNumber: 10002
+        gidNumber: 10001
+        homeDirectory: /home/hashmark
+        # Generated with: slappasswd -s 'cucumber!!'
+        userPassword: "{SSHA}0yn3FQE7W8Tw429wtpUuRnoRJr7pzg2h"
         loginShell: /bin/bash
 
   - name: Fetch generated self-signed OpenLDAP cert
